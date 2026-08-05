@@ -110,9 +110,12 @@ header{background: var(--theme-gradient); color:#111; text-align:center; padding
 
 .user-card{width:calc(100% - 20px);margin:10px auto;padding:15px;border-radius:15px;background:#222;cursor:pointer;border: 1px solid #333;box-sizing: border-box; position: relative;}
 .user-card.redbg{background:linear-gradient(145deg, #8b0000, #5a0000) !important; border-color: #ff4444 !important;}
+
 .row{display:flex;justify-content:space-between; align-items:center; font-size: var(--app-font-size); padding-right: 35px;}
 
 .menu-dot-btn { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: transparent; color: var(--theme-color); font-size: 24px; border: none; padding: 5px; cursor: pointer; z-index: 10;}
+/* அந்த குறிப்பிட்ட தேதிக்குள் டெபிட் உள்ள யூசர்களின் 3 புள்ளிகள் மட்டும் நீல நிறத்தில் மாற */
+.menu-dot-btn.bluedot { color: #1e88e5 !important; }
 
 .profile-header{background:#222; padding:15px 20px; border-bottom: 2px solid var(--theme-color); margin-bottom: 5px; position: relative;}
 .profile-header h2{margin:0 0 15px 0; color: var(--theme-color); text-align: center; font-size: calc(var(--app-font-size) + 8px); padding-top: 5px;}
@@ -185,7 +188,6 @@ input:checked + .slider:before { transform: translateX(22px); }
             <div class="stat-box red-border"><small style="color:#ff5252;">10% Collection</small><h2 id="tenPercentTotal">0</h2></div>
         </div>
 
-        <!-- தேதி வடிகட்டி மற்றும் நீல நிறப் பெட்டிகள் (மஞ்சள் நிற எழுத்துகளுடன்) -->
         <div class="date-filter-box" id="dateFilterWrapper">
             <div style="flex:1;">
                 <small style="color:#aaa; font-size:11px; font-weight:bold; display:block; margin-bottom:2px;">FROM</small>
@@ -446,7 +448,6 @@ function applyConfigUI() {
     document.getElementById("dashboardWrapper").style.display = appConfig.showDash ? "grid" : "none";
     document.getElementById("searchBoxWrapper").style.display = appConfig.showSearch ? "block" : "none";
     
-    // தேதி ஃபில்டர் மற்றும் நீல நிற பாக்ஸ்களை காண்பித்தல் / மறைத்தல்
     let dateVis = appConfig.showDateFilter ? "flex" : "none";
     let gridVis = appConfig.showDateFilter ? "grid" : "none";
     document.getElementById("dateFilterWrapper").style.display = dateVis;
@@ -600,18 +601,40 @@ function renderUsers(){
     filtered.forEach((u)=>{
         let realIdx = users.indexOf(u);
         let card = document.createElement("div");
-        card.className = "user-card" + (isRed(u) ? " redbg" : "");
+        
+        let bal = getBalance(u);
+        let redCheck = isRed(u);
+
+        let cardClass = "user-card";
+        if(redCheck) {
+            cardClass += " redbg";
+        }
+
+        card.className = cardClass;
         card.onclick = () => openUser(realIdx);
         
+        // அந்த குறிப்பிட்ட தேதி வரம்பிற்குள் இந்த யூசருக்கு டெபிட் (Debit) என்ட்ரி உள்ளதா என்று சோதித்தல்
+        let hasDebitInDateRange = false;
+        if(u.transactions && Array.isArray(u.transactions)) {
+            hasDebitInDateRange = u.transactions.some(t => {
+                let tDate = t.date ? String(t.date).split("T")[0] : "";
+                let dbVal = Number(t.debit || 0);
+                return tDate && startDate && endDate && tDate >= startDate && tDate <= endDate && dbVal > 0;
+            });
+        }
+
+        // டெபிட் உள்ள யூசர்களுக்கு மட்டும் 'bluedot' சேர்க்கப்படும்
+        let dotClass = "menu-dot-btn" + (hasDebitInDateRange ? " bluedot" : "");
+
         card.innerHTML = `
             <div class="row">
                 <div>
                     <b>${u.name}</b><br>
                     <small style="font-size:13px;">${u.mobile || ''}</small>
                 </div>
-                <div style="font-weight:bold;">₹ ${getBalance(u).toLocaleString()}</div>
+                <div style="font-weight:bold;">₹ ${bal.toLocaleString()}</div>
             </div>
-            <button class="menu-dot-btn" onclick="triggerActionMenu(event, ${realIdx}, '${u.name}')">&#8942;</button>
+            <button class="${dotClass}" onclick="triggerActionMenu(event, ${realIdx}, '${u.name}')">&#8942;</button>
         `;
         listDiv.appendChild(card);
     });
