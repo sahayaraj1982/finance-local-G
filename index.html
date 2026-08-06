@@ -110,12 +110,13 @@ header{background: var(--theme-gradient); color:#111; text-align:center; padding
 
 .user-card{width:calc(100% - 20px);margin:10px auto;padding:15px;border-radius:15px;background:#222;cursor:pointer;border: 1px solid #333;box-sizing: border-box; position: relative;}
 .user-card.redbg{background:linear-gradient(145deg, #8b0000, #5a0000) !important; border-color: #ff4444 !important;}
+/* நீல நிற யூசர் கார்டுக்கான புதிய டிசைன் (சிவப்பு போல முழுமையாக) */
+.user-card.bluebg{background:linear-gradient(145deg, #0d3b66, #0b2545) !important; border-color: #1e88e5 !important;}
 
 .row{display:flex;justify-content:space-between; align-items:center; font-size: var(--app-font-size); padding-right: 35px;}
 
 .menu-dot-btn { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: transparent; color: var(--theme-color); font-size: 24px; border: none; padding: 5px; cursor: pointer; z-index: 10;}
-/* அந்த குறிப்பிட்ட தேதிக்குள் டெபிட் உள்ள யூசர்களின் 3 புள்ளிகள் மட்டும் நீல நிறத்தில் மாற */
-.menu-dot-btn.bluedot { color: #1e88e5 !important; }
+.user-card.bluebg .menu-dot-btn { color: #42a5f5 !important; }
 
 .profile-header{background:#222; padding:15px 20px; border-bottom: 2px solid var(--theme-color); margin-bottom: 5px; position: relative;}
 .profile-header h2{margin:0 0 15px 0; color: var(--theme-color); text-align: center; font-size: calc(var(--app-font-size) + 8px); padding-top: 5px;}
@@ -550,6 +551,21 @@ function getTenPercent(u) {
     return loan ? (Number(loan.debit) * 0.10) : 0;
 }
 
+// குறிப்பிட்ட தேதிக்குள் இந்த யூசரின் டெபிட் தொகையை கணக்கிட
+function getDebitInDateRange(u, startDate, endDate) {
+    let sum = 0;
+    if(u.transactions && Array.isArray(u.transactions)) {
+        u.transactions.forEach(t => {
+            let tDate = t.date ? String(t.date).split("T")[0] : "";
+            let dbVal = Number(t.debit || 0);
+            if(tDate && startDate && endDate && tDate >= startDate && tDate <= endDate && dbVal > 0) {
+                sum += dbVal;
+            }
+        });
+    }
+    return sum;
+}
+
 function renderUsers(){
     const searchInput = document.getElementById("userSearch");
     const search = searchInput ? searchInput.value.toLowerCase().trim() : "";
@@ -591,10 +607,28 @@ function renderUsers(){
         return nameMatch || mobileMatch;
     });
     
+    // வரிசைப்படுத்தும் முறை (Sorting): 
+    // 1. சிவப்பு யூசர்கள் முதலில்
+    // 2. குறிப்பிட்ட தேதிக்குள் டெபிட் உள்ள நீல யூசர்கள் அடுத்து (குறைந்த தொகையிலிருந்து அதிக தொகை வரிசையில்)
+    // 3. மற்றவர்கள்
     filtered.sort((a, b) => {
         let a_red = isRed(a) ? 1 : 0;
         let b_red = isRed(b) ? 1 : 0;
         if (a_red !== b_red) { return b_red - a_red; }
+
+        let a_debit_amt = getDebitInDateRange(a, startDate, endDate);
+        let b_debit_amt = getDebitInDateRange(b, startDate, endDate);
+
+        let a_blue = a_debit_amt > 0 ? 1 : 0;
+        let b_blue = b_debit_amt > 0 ? 1 : 0;
+
+        if (a_blue !== b_blue) { return b_blue - a_blue; }
+
+        // இரண்டுமே நீல யூசர்களாக இருந்தால், குறைந்த தொகையிலிருந்து அதிக தொகைக்கு (Ascending Order) அடுக்க
+        if (a_blue && b_blue) {
+            return a_debit_amt - b_debit_amt;
+        }
+
         return Math.abs(getBalance(a)) - Math.abs(getBalance(b));
     });
 
@@ -604,28 +638,20 @@ function renderUsers(){
         
         let bal = getBalance(u);
         let redCheck = isRed(u);
+        let debitAmt = getDebitInDateRange(u, startDate, endDate);
+        let blueCheck = debitAmt > 0;
 
+        // கார்டு நிறம்: சிவப்பு இருந்தால் redbg, இல்லையென்றால் அந்த தேதிக்குள் டெபிட் இருந்தால் bluebg
         let cardClass = "user-card";
         if(redCheck) {
             cardClass += " redbg";
+        } else if(blueCheck) {
+            cardClass += " bluebg";
         }
 
         card.className = cardClass;
         card.onclick = () => openUser(realIdx);
         
-        // அந்த குறிப்பிட்ட தேதி வரம்பிற்குள் இந்த யூசருக்கு டெபிட் (Debit) என்ட்ரி உள்ளதா என்று சோதித்தல்
-        let hasDebitInDateRange = false;
-        if(u.transactions && Array.isArray(u.transactions)) {
-            hasDebitInDateRange = u.transactions.some(t => {
-                let tDate = t.date ? String(t.date).split("T")[0] : "";
-                let dbVal = Number(t.debit || 0);
-                return tDate && startDate && endDate && tDate >= startDate && tDate <= endDate && dbVal > 0;
-            });
-        }
-
-        // டெபிட் உள்ள யூசர்களுக்கு மட்டும் 'bluedot' சேர்க்கப்படும்
-        let dotClass = "menu-dot-btn" + (hasDebitInDateRange ? " bluedot" : "");
-
         card.innerHTML = `
             <div class="row">
                 <div>
@@ -634,7 +660,7 @@ function renderUsers(){
                 </div>
                 <div style="font-weight:bold;">₹ ${bal.toLocaleString()}</div>
             </div>
-            <button class="${dotClass}" onclick="triggerActionMenu(event, ${realIdx}, '${u.name}')">&#8942;</button>
+            <button class="menu-dot-btn" onclick="triggerActionMenu(event, ${realIdx}, '${u.name}')">&#8942;</button>
         `;
         listDiv.appendChild(card);
     });
