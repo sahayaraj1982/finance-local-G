@@ -184,8 +184,8 @@ input:checked + .slider:before { transform: translateX(22px); }
         <div class="dashboard" id="dashboardWrapper">
             <div class="stat-box"><small>Total Users</small><h2 id="totalUsers">0</h2></div>
             <div class="stat-box"><small>Total Balance</small><h2 id="totalBalance">0</h2></div>
-            <div class="stat-box red-border"><small style="color:#ff5252;">Red Users</small><h2 id="redUsersCount">0</h2></div>
-            <div class="stat-box red-border"><small style="color:#ff5252;">10% Collection</small><h2 id="tenPercentTotal">0</h2></div>
+            <div class="stat-box red-border" id="redDashboardBox"><small style="color:#ff5252;">Red Users</small><h2 id="redUsersCount">0</h2></div>
+            <div class="stat-box red-border" id="tenPercentDashboardBox"><small style="color:#ff5252;">10% Collection</small><h2 id="tenPercentTotal">0</h2></div>
         </div>
 
         <div class="date-filter-box" id="dateFilterWrapper">
@@ -317,6 +317,16 @@ input:checked + .slider:before { transform: translateX(22px); }
         </div>
 
         <div class="setting-row">
+            <span>சிவப்பு யூசர் ஹைலைட் & சாட்டிங் (Red Users)</span>
+            <label class="switch"><input type="checkbox" id="switchRedHighlight" onchange="applySettings()"><span class="slider"></span></label>
+        </div>
+
+        <div class="setting-row">
+            <span>நீல யூசர் ஹைலைட் & சாட்டிங் (Blue Users)</span>
+            <label class="switch"><input type="checkbox" id="switchBlueHighlight" onchange="applySettings()"><span class="slider"></span></label>
+        </div>
+
+        <div class="setting-row">
             <span>Google Sheet ஒத்திசைவு (Cloud Sync)</span>
             <label class="switch"><input type="checkbox" id="switchCloud" checked onchange="applySettings()"><span class="slider"></span></label>
         </div>
@@ -378,6 +388,8 @@ let appConfig = JSON.parse(localStorage.getItem("financeConfig")) || {
     showDash: true,
     showSearch: true,
     showDateFilter: true,
+    showRedHighlight: false,  // இயல்புநிலை ஆஃப்
+    showBlueHighlight: false, // இயல்புநிலை ஆஃப்
     showCloud: true
 };
 
@@ -398,6 +410,8 @@ function initConfig() {
     document.getElementById("switchDash").checked = appConfig.showDash;
     document.getElementById("switchSearch").checked = appConfig.showSearch;
     document.getElementById("switchDateFilter").checked = appConfig.showDateFilter !== undefined ? appConfig.showDateFilter : true;
+    document.getElementById("switchRedHighlight").checked = appConfig.showRedHighlight !== undefined ? appConfig.showRedHighlight : false;
+    document.getElementById("switchBlueHighlight").checked = appConfig.showBlueHighlight !== undefined ? appConfig.showBlueHighlight : false;
     document.getElementById("switchCloud").checked = appConfig.showCloud !== undefined ? appConfig.showCloud : true;
 
     let todayStr = new Date().toISOString().split("T")[0];
@@ -422,12 +436,13 @@ function applySettings() {
     appConfig.showDash = document.getElementById("switchDash").checked;
     appConfig.showSearch = document.getElementById("switchSearch").checked;
     appConfig.showDateFilter = document.getElementById("switchDateFilter").checked;
+    appConfig.showRedHighlight = document.getElementById("switchRedHighlight").checked;
+    appConfig.showBlueHighlight = document.getElementById("switchBlueHighlight").checked;
     appConfig.showCloud = document.getElementById("switchCloud").checked;
     
     localStorage.setItem("financeConfig", JSON.stringify(appConfig));
     applyConfigUI();
     
-    // உடனடியாக ரெண்டர் செய்து மாற்றங்களை உடனே காட்ட
     setTimeout(() => {
         renderUsers();
     }, 50);
@@ -452,8 +467,13 @@ function applyConfigUI() {
     document.getElementById("dashboardWrapper").style.display = appConfig.showDash ? "grid" : "none";
     document.getElementById("searchBoxWrapper").style.display = appConfig.showSearch ? "block" : "none";
     
-    let dateVis = appConfig.showDateFilter ? "flex" : "none";
-    let gridVis = appConfig.showDateFilter ? "grid" : "none";
+    // சிவப்பு பாக்ஸ்கள் (Red Users & 10% Collection) ஆன்/ஆஃப் கட்டுப்பாடு
+    document.getElementById("redDashboardBox").style.display = appConfig.showRedHighlight ? "block" : "none";
+    document.getElementById("tenPercentDashboardBox").style.display = appConfig.showRedHighlight ? "block" : "none";
+
+    // நீல பாக்ஸ்கள் & தேதி ஃபில்டர் ஆன்/ஆஃப் கட்டுப்பாடு
+    let dateVis = (appConfig.showDateFilter && appConfig.showBlueHighlight) ? "flex" : "none";
+    let gridVis = (appConfig.showDateFilter && appConfig.showBlueHighlight) ? "grid" : "none";
     document.getElementById("dateFilterWrapper").style.display = dateVis;
     document.getElementById("dateDashboardWrapper").style.display = gridVis;
 
@@ -610,20 +630,24 @@ function renderUsers(){
     });
     
     filtered.sort((a, b) => {
-        let a_red = isRed(a) ? 1 : 0;
-        let b_red = isRed(b) ? 1 : 0;
-        if (a_red !== b_red) { return b_red - a_red; }
+        if (appConfig.showRedHighlight) {
+            let a_red = isRed(a) ? 1 : 0;
+            let b_red = isRed(b) ? 1 : 0;
+            if (a_red !== b_red) { return b_red - a_red; }
+        }
 
-        let a_debit_amt = getDebitInDateRange(a, startDate, endDate);
-        let b_debit_amt = getDebitInDateRange(b, startDate, endDate);
+        if (appConfig.showBlueHighlight && appConfig.showDateFilter) {
+            let a_debit_amt = getDebitInDateRange(a, startDate, endDate);
+            let b_debit_amt = getDebitInDateRange(b, startDate, endDate);
 
-        let a_blue = a_debit_amt > 0 ? 1 : 0;
-        let b_blue = b_debit_amt > 0 ? 1 : 0;
+            let a_blue = a_debit_amt > 0 ? 1 : 0;
+            let b_blue = b_debit_amt > 0 ? 1 : 0;
 
-        if (a_blue !== b_blue) { return b_blue - a_blue; }
+            if (a_blue !== b_blue) { return b_blue - a_blue; }
 
-        if (a_blue && b_blue) {
-            return a_debit_amt - b_debit_amt;
+            if (a_blue && b_blue) {
+                return a_debit_amt - b_debit_amt;
+            }
         }
 
         return Math.abs(getBalance(a)) - Math.abs(getBalance(b));
@@ -634,9 +658,9 @@ function renderUsers(){
         let card = document.createElement("div");
         
         let bal = getBalance(u);
-        let redCheck = isRed(u);
+        let redCheck = appConfig.showRedHighlight && isRed(u);
         let debitAmt = getDebitInDateRange(u, startDate, endDate);
-        let blueCheck = appConfig.showDateFilter && (debitAmt > 0);
+        let blueCheck = appConfig.showBlueHighlight && appConfig.showDateFilter && (debitAmt > 0);
 
         let cardClass = "user-card";
         if(redCheck) {
