@@ -110,7 +110,6 @@ header{background: var(--theme-gradient); color:#111; text-align:center; padding
 
 .user-card{width:calc(100% - 20px);margin:10px auto;padding:15px;border-radius:15px;background:#222;cursor:pointer;border: 1px solid #333;box-sizing: border-box; position: relative;}
 .user-card.redbg{background:linear-gradient(145deg, #8b0000, #5a0000) !important; border-color: #ff4444 !important;}
-/* நீல நிற யூசர் கார்டுக்கான புதிய டிசைன் (சிவப்பு போல முழுமையாக) */
 .user-card.bluebg{background:linear-gradient(145deg, #0d3b66, #0b2545) !important; border-color: #1e88e5 !important;}
 
 .row{display:flex;justify-content:space-between; align-items:center; font-size: var(--app-font-size); padding-right: 35px;}
@@ -427,7 +426,11 @@ function applySettings() {
     
     localStorage.setItem("financeConfig", JSON.stringify(appConfig));
     applyConfigUI();
-    renderUsers();
+    
+    // உடனடியாக ரெண்டர் செய்து மாற்றங்களை உடனே காட்ட
+    setTimeout(() => {
+        renderUsers();
+    }, 50);
 }
 
 function applyConfigUI() {
@@ -551,7 +554,6 @@ function getTenPercent(u) {
     return loan ? (Number(loan.debit) * 0.10) : 0;
 }
 
-// குறிப்பிட்ட தேதிக்குள் இந்த யூசரின் டெபிட் தொகையை கணக்கிட
 function getDebitInDateRange(u, startDate, endDate) {
     let sum = 0;
     if(u.transactions && Array.isArray(u.transactions)) {
@@ -607,10 +609,6 @@ function renderUsers(){
         return nameMatch || mobileMatch;
     });
     
-    // வரிசைப்படுத்தும் முறை (Sorting): 
-    // 1. சிவப்பு யூசர்கள் முதலில்
-    // 2. குறிப்பிட்ட தேதிக்குள் டெபிட் உள்ள நீல யூசர்கள் அடுத்து (குறைந்த தொகையிலிருந்து அதிக தொகை வரிசையில்)
-    // 3. மற்றவர்கள்
     filtered.sort((a, b) => {
         let a_red = isRed(a) ? 1 : 0;
         let b_red = isRed(b) ? 1 : 0;
@@ -624,7 +622,6 @@ function renderUsers(){
 
         if (a_blue !== b_blue) { return b_blue - a_blue; }
 
-        // இரண்டுமே நீல யூசர்களாக இருந்தால், குறைந்த தொகையிலிருந்து அதிக தொகைக்கு (Ascending Order) அடுக்க
         if (a_blue && b_blue) {
             return a_debit_amt - b_debit_amt;
         }
@@ -639,9 +636,8 @@ function renderUsers(){
         let bal = getBalance(u);
         let redCheck = isRed(u);
         let debitAmt = getDebitInDateRange(u, startDate, endDate);
-        let blueCheck = debitAmt > 0;
+        let blueCheck = appConfig.showDateFilter && (debitAmt > 0);
 
-        // கார்டு நிறம்: சிவப்பு இருந்தால் redbg, இல்லையென்றால் அந்த தேதிக்குள் டெபிட் இருந்தால் bluebg
         let cardClass = "user-card";
         if(redCheck) {
             cardClass += " redbg";
